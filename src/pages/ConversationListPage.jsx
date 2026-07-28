@@ -676,107 +676,99 @@ function NotificationsPanel({ onClose }) {
 
 
 // ────────────────────────────────────────────────────────────
-// Draggable bottom drawer — opens at 75 vh, draggable to 100 vh
+// Draggable bottom drawer — opens at 75vh, drag to 100vh
+// Strategy: Paper is always 100vh; translateY controls how much shows.
+// 25% translateY = 75vh visible (default). 0% = full screen.
+// Uses plain Drawer so MUI never intercepts our touch events.
 // ────────────────────────────────────────────────────────────
 function DraggableBottomDrawer({ open, onClose, children }) {
-  const DEFAULT_HEIGHT = 75; // vh when first opened
-  const MIN_HEIGHT = 75;     // vh floor (can't drag below this)
-  const MAX_HEIGHT = 100;    // vh ceiling (full screen)
+  const DEFAULT_Y = 25; // 75vh visible by default
 
-  // drawerHeight tracks the CURRENT height as a % of viewport
-  const [drawerHeight, setDrawerHeight] = useState(DEFAULT_HEIGHT);
-  const dragStartY = useRef(null);
-  const dragStartHeight = useRef(null);
-  const paperRef = useRef(null);
+  const [translateY, setTranslateY] = useState(DEFAULT_Y);
+  const [isDragging, setIsDragging] = useState(false);
+  const touchStartY = useRef(0);
+  const touchStartTranslate = useRef(DEFAULT_Y);
 
-  // Reset to default whenever drawer opens
   useEffect(() => {
-    if (open) setDrawerHeight(DEFAULT_HEIGHT);
+    if (open) setTranslateY(DEFAULT_Y);
   }, [open]);
 
-  const onTouchStart = (e) => {
-    dragStartY.current = e.touches[0].clientY;
-    dragStartHeight.current = drawerHeight;
+  const handleTouchStart = (e) => {
+    e.stopPropagation();
+    touchStartY.current = e.touches[0].clientY;
+    touchStartTranslate.current = translateY;
+    setIsDragging(true);
   };
 
-  const onTouchMove = (e) => {
-    if (dragStartY.current === null) return;
-    const deltaY = dragStartY.current - e.touches[0].clientY; // positive = drag up
-    const deltaVh = (deltaY / window.innerHeight) * 100;
-    const newHeight = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, dragStartHeight.current + deltaVh));
-    setDrawerHeight(newHeight);
+  const handleTouchMove = (e) => {
+    e.stopPropagation();
+    const deltaY = e.touches[0].clientY - touchStartY.current;
+    const deltaPct = (deltaY / window.innerHeight) * 100;
+    const next = touchStartTranslate.current + deltaPct;
+    setTranslateY(Math.max(0, Math.min(35, next)));
   };
 
-  const onTouchEnd = () => {
-    dragStartY.current = null;
-    // Snap: if dragged close to max, snap to 100; else snap back to 75
-    if (drawerHeight > 90) {
-      setDrawerHeight(MAX_HEIGHT);
-    } else if (drawerHeight < MIN_HEIGHT + 5) {
+  const handleTouchEnd = (e) => {
+    e.stopPropagation();
+    setIsDragging(false);
+    if (translateY >= 30) {
       onClose();
+      setTranslateY(DEFAULT_Y);
+    } else if (translateY <= 12) {
+      setTranslateY(0);
     } else {
-      setDrawerHeight(MIN_HEIGHT);
+      setTranslateY(DEFAULT_Y);
     }
   };
 
   return (
-    <SwipeableDrawer
+    <Drawer
       anchor="bottom"
       open={open}
       onClose={onClose}
-      onOpen={() => {}}
-      disableSwipeToOpen
-      // Disable MUI's built-in swipe-to-close so our custom drag handle owns Y movement
-      disableBackdropTransition
-      hysteresis={0.3}
       PaperProps={{
-        ref: paperRef,
         sx: {
-          height: `${drawerHeight}vh`,
-          maxHeight: '100vh',
-          borderTopLeftRadius: drawerHeight >= MAX_HEIGHT ? 0 : 20,
-          borderTopRightRadius: drawerHeight >= MAX_HEIGHT ? 0 : 20,
+          height: '100vh',
+          borderTopLeftRadius: translateY === 0 ? 0 : 20,
+          borderTopRightRadius: translateY === 0 ? 0 : 20,
           overflow: 'hidden',
-          transition: dragStartY.current === null
-            ? 'height 0.25s cubic-bezier(0.4,0,0.2,1), border-radius 0.25s ease'
-            : 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          transform: `translateY(${translateY}%) !important`,
+          transition: isDragging
+            ? 'none !important'
+            : 'transform 0.3s cubic-bezier(0.4,0,0.2,1), border-radius 0.2s ease',
         },
       }}
     >
-      {/* Drag handle — the only area that drives the resize */}
+      {/* Drag handle — touchAction:none prevents scroll conflicts */}
       <Box
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         sx={{
           width: '100%',
-          pt: 1.5,
-          pb: 0.5,
+          py: 1.5,
           display: 'flex',
+          alignItems: 'center',
           justifyContent: 'center',
-          cursor: 'grab',
           flexShrink: 0,
-          touchAction: 'none', // prevent page scroll while dragging
+          cursor: 'grab',
+          touchAction: 'none',
           userSelect: 'none',
+          WebkitUserSelect: 'none',
         }}
       >
-        <Box
-          sx={{
-            width: 40,
-            height: 4,
-            bgcolor: 'divider',
-            borderRadius: 2,
-          }}
-        />
+        <Box sx={{ width: 44, height: 5, bgcolor: 'action.disabled', borderRadius: 3 }} />
       </Box>
 
-      {/* Content — fills the remaining height and scrolls internally */}
       <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {children}
       </Box>
-    </SwipeableDrawer>
+    </Drawer>
   );
 }
+
 
 // ────────────────────────────────────────────────────────────
 // Main: Conversation list
