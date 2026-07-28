@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { subscribeToUserQueue } from '../services/stompService';
 import { getConversations } from '../services/conversationService';
 import { useAuth } from './AuthContext';
+import { playNotificationSound } from '../utils/sounds';
 
 /**
  * NotificationType enum values matching the backend.
@@ -87,14 +88,30 @@ export function NotificationProvider({ children }) {
         const qc = qcRef.current;
 
         if (type === NotificationType.REQUEST_RECEIVED) {
+          // Someone sent YOU a chat request:
+          // → badge on bell, store notification, refresh the requests list
+          playNotificationSound();
           setNotifications((prev) => [event, ...prev]);
           setBadgeCount((c) => c + 1);
           qc.invalidateQueries({ queryKey: ['chatRequests'] });
 
         } else if (type === NotificationType.REQUEST_ACCEPTED) {
+          // Someone ACCEPTED your request → new conversation exists now:
+          // → badge on bell, store notification,
+          //   force-refetch conversations so new chat appears immediately,
+          //   also refresh requests list (status changes to ACCEPTED)
+          playNotificationSound();
           setNotifications((prev) => [event, ...prev]);
+          setBadgeCount((c) => c + 1);
           qc.invalidateQueries({ queryKey: ['chatRequests'] });
-          qc.invalidateQueries({ queryKey: ['conversations'] });
+          // Force immediate refetch so sidebar shows the new conversation right away
+          qc.fetchQuery({
+            queryKey: ['conversations'],
+            queryFn: getConversations,
+            staleTime: 0,
+          }).catch(() => {
+            qc.invalidateQueries({ queryKey: ['conversations'] });
+          });
 
         } else if (type === NotificationType.MESSAGE) {
           // Parse conversation id
@@ -109,6 +126,7 @@ export function NotificationProvider({ children }) {
             conversationId === activeConversationIdRef.current;
 
           if (!isViewingThatConvo) {
+            playNotificationSound();
             // ── Increment local unread counter for this conversation ──────────
             if (conversationId != null) {
               setUnreadCounts((prev) => ({

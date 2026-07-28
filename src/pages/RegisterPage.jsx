@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { Box, Typography, TextField, Button, Link, CircularProgress, Alert } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { register, login } from '../services/authService';
+import EasyChatLogo from '../components/common/EasyChatLogo';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -49,17 +50,7 @@ export default function RegisterPage() {
       }}
     >
       {/* Brand */}
-      <Typography
-        variant="h4"
-        sx={{
-          fontWeight: 700,
-          color: '#111',
-          mb: 5,
-          letterSpacing: '-0.5px',
-        }}
-      >
-        EasyChat
-      </Typography>
+      <EasyChatLogo variant="h4" sx={{ mb: 5 }} />
 
       {/* Card */}
       <Box

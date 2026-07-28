@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { searchProfiles } from '../services/userService';
+import EasyChatLogo from '../components/common/EasyChatLogo';
 import {
   Box,
   List,
@@ -680,55 +681,72 @@ function NotificationsPanel({ onClose }) {
 // Opens at 75vh. Drag handle up → all the way to 100vh.
 // ────────────────────────────────────────────────────────────
 function DraggableBottomDrawer({ open, onClose, children }) {
-  // translateY: 25 = 75vh visible (default), 0 = 100vh (fullscreen), 100 = hidden
-  const [translateY, setTranslateY] = useState(100);
-  const [isDragging, setIsDragging] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [animatedIn, setAnimatedIn] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  // Current Y during drag (null = not dragging, use animatedIn to determine position)
+  const [dragY, setDragY] = useState(null);
   const touchStartY = useRef(0);
-  const touchStartTY = useRef(25);
+  const touchStartDragY = useRef(25);
 
-  // Mount / animate in-out
+  // Phase 1: mount/unmount DOM node
   useEffect(() => {
     if (open) {
       setMounted(true);
-      // defer so the element is in DOM before we animate
-      requestAnimationFrame(() => requestAnimationFrame(() => setTranslateY(25)));
     } else {
-      setTranslateY(100);
-      const t = setTimeout(() => setMounted(false), 320);
+      // Animate out first, then unmount after transition finishes
+      setAnimatedIn(false);
+      const t = setTimeout(() => setMounted(false), 340);
       return () => clearTimeout(t);
     }
   }, [open]);
 
+  // Phase 2: after mount, trigger slide-UP animation on next frame
+  useEffect(() => {
+    if (mounted && open) {
+      const id = requestAnimationFrame(() => setAnimatedIn(true));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [mounted, open]);
+
   const handleTouchStart = (e) => {
     touchStartY.current = e.touches[0].clientY;
-    touchStartTY.current = translateY;
+    // Start drag from current resting position (25 = 75vh, 0 = full)
+    touchStartDragY.current = animatedIn ? 25 : 25;
     setIsDragging(true);
+    setDragY(25);
   };
 
   const handleTouchMove = (e) => {
     const deltaY = e.touches[0].clientY - touchStartY.current;
     const deltaPct = (deltaY / window.innerHeight) * 100;
-    const next = touchStartTY.current + deltaPct;
-    // Allow 0 (full) to 40 (past close threshold)
-    setTranslateY(Math.max(0, Math.min(40, next)));
+    const next = touchStartDragY.current + deltaPct;
+    setDragY(Math.max(0, Math.min(40, next)));
   };
 
   const handleTouchEnd = () => {
     setIsDragging(false);
-    if (translateY >= 32) {
-      onClose(); // close
-    } else if (translateY <= 12) {
-      setTranslateY(0); // snap to full screen
-    } else {
-      setTranslateY(25); // snap back to 75vh
+    const y = dragY ?? 25;
+    setDragY(null);
+    if (y >= 32) {
+      onClose();
+    } else if (y <= 12) {
+      // snap to full screen — keep animatedIn true, dragY back to 0
+      setDragY(0);
+      setTimeout(() => setDragY(null), 350);
     }
+    // else: snap back to 75vh default (dragY null + animatedIn true = translateY 25)
   };
 
   if (!mounted) return null;
 
-  const isFullScreen = translateY === 0;
-  const backdropOpacity = Math.max(0, Math.min(1, (100 - translateY) / 75));
+  // Compute the actual translateY for the sheet:
+  // - dragging: use live dragY value
+  // - resting open: 25% = 75vh visible
+  // - resting closed (animating out): 100% = fully off screen
+  const sheetY = dragY !== null ? dragY : animatedIn ? 25 : 100;
+  const isFullScreen = sheetY === 0;
+  const backdropOpacity = Math.max(0, Math.min(1, (100 - sheetY) / 75));
 
   return createPortal(
     <>
@@ -760,10 +778,10 @@ function DraggableBottomDrawer({ open, onClose, children }) {
           flexDirection: 'column',
           overflow: 'hidden',
           boxShadow: '0 -4px 32px rgba(0,0,0,0.12)',
-          transform: `translateY(${translateY}%)`,
+          transform: `translateY(${sheetY}%)`,
           transition: isDragging
             ? 'none'
-            : 'transform 0.3s cubic-bezier(0.4,0,0.2,1), border-radius 0.2s ease',
+            : 'transform 0.32s cubic-bezier(0.4,0,0.2,1), border-radius 0.2s ease',
           willChange: 'transform',
         }}
       >
@@ -862,13 +880,7 @@ export default function ConversationListPage() {
           flexShrink: 0,
         }}
       >
-        <Typography
-          variant="h5"
-          fontWeight={800}
-          sx={{ color: '#111', letterSpacing: -0.5 }}
-        >
-          EasyChat
-        </Typography>
+        <EasyChatLogo variant="h5" />
 
         {/* Both mobile + desktop: profile avatar in top bar */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { formatChatTime, getInitials, stringToColor } from '../utils/formatters';
 import { subscribeToTopic } from '../services/stompService';
+import { playSentSound, playMessageReceivedSound } from '../utils/sounds';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -77,6 +78,7 @@ export default function ChatPage() {
               m.content === newMsg.content)
         )
       );
+      playSentSound();
       setInput('');
     },
   });
@@ -100,6 +102,7 @@ export default function ChatPage() {
         }
 
         // 1. Add to live buffer immediately so UI updates right away
+        playMessageReceivedSound();
         setLiveMessages((prev) => {
           const key = `${msg.authorUsername}|${msg.content}|${msg.createdAt}`;
           const alreadyIn = prev.some(
