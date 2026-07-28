@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { searchProfiles } from '../services/userService';
@@ -16,7 +17,6 @@ import {
   Skeleton,
   Divider,
   Drawer,
-  SwipeableDrawer,
   TextField,
   InputAdornment,
   Card,
@@ -676,96 +676,132 @@ function NotificationsPanel({ onClose }) {
 
 
 // ────────────────────────────────────────────────────────────
-// Draggable bottom drawer — opens at 75vh, drag to 100vh
-// Strategy: Paper is always 100vh; translateY controls how much shows.
-// 25% translateY = 75vh visible (default). 0% = full screen.
-// Uses plain Drawer so MUI never intercepts our touch events.
+// Custom bottom sheet — pure portal + CSS. No MUI Drawer.
+// Opens at 75vh. Drag handle up → all the way to 100vh.
 // ────────────────────────────────────────────────────────────
 function DraggableBottomDrawer({ open, onClose, children }) {
-  const DEFAULT_Y = 25; // 75vh visible by default
-
-  const [translateY, setTranslateY] = useState(DEFAULT_Y);
+  // translateY: 25 = 75vh visible (default), 0 = 100vh (fullscreen), 100 = hidden
+  const [translateY, setTranslateY] = useState(100);
   const [isDragging, setIsDragging] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const touchStartY = useRef(0);
-  const touchStartTranslate = useRef(DEFAULT_Y);
+  const touchStartTY = useRef(25);
 
+  // Mount / animate in-out
   useEffect(() => {
-    if (open) setTranslateY(DEFAULT_Y);
+    if (open) {
+      setMounted(true);
+      // defer so the element is in DOM before we animate
+      requestAnimationFrame(() => requestAnimationFrame(() => setTranslateY(25)));
+    } else {
+      setTranslateY(100);
+      const t = setTimeout(() => setMounted(false), 320);
+      return () => clearTimeout(t);
+    }
   }, [open]);
 
   const handleTouchStart = (e) => {
-    e.stopPropagation();
     touchStartY.current = e.touches[0].clientY;
-    touchStartTranslate.current = translateY;
+    touchStartTY.current = translateY;
     setIsDragging(true);
   };
 
   const handleTouchMove = (e) => {
-    e.stopPropagation();
     const deltaY = e.touches[0].clientY - touchStartY.current;
     const deltaPct = (deltaY / window.innerHeight) * 100;
-    const next = touchStartTranslate.current + deltaPct;
-    setTranslateY(Math.max(0, Math.min(35, next)));
+    const next = touchStartTY.current + deltaPct;
+    // Allow 0 (full) to 40 (past close threshold)
+    setTranslateY(Math.max(0, Math.min(40, next)));
   };
 
-  const handleTouchEnd = (e) => {
-    e.stopPropagation();
+  const handleTouchEnd = () => {
     setIsDragging(false);
-    if (translateY >= 30) {
-      onClose();
-      setTranslateY(DEFAULT_Y);
+    if (translateY >= 32) {
+      onClose(); // close
     } else if (translateY <= 12) {
-      setTranslateY(0);
+      setTranslateY(0); // snap to full screen
     } else {
-      setTranslateY(DEFAULT_Y);
+      setTranslateY(25); // snap back to 75vh
     }
   };
 
-  return (
-    <Drawer
-      anchor="bottom"
-      open={open}
-      onClose={onClose}
-      PaperProps={{
-        sx: {
+  if (!mounted) return null;
+
+  const isFullScreen = translateY === 0;
+  const backdropOpacity = Math.max(0, Math.min(1, (100 - translateY) / 75));
+
+  return createPortal(
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: `rgba(0,0,0,${(backdropOpacity * 0.5).toFixed(2)})`,
+          zIndex: 1299,
+          transition: isDragging ? 'none' : 'background-color 0.3s ease',
+        }}
+      />
+
+      {/* Sheet */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
           height: '100vh',
-          borderTopLeftRadius: translateY === 0 ? 0 : 20,
-          borderTopRightRadius: translateY === 0 ? 0 : 20,
-          overflow: 'hidden',
+          zIndex: 1300,
+          backgroundColor: '#fff',
+          borderTopLeftRadius: isFullScreen ? 0 : 20,
+          borderTopRightRadius: isFullScreen ? 0 : 20,
           display: 'flex',
           flexDirection: 'column',
-          transform: `translateY(${translateY}%) !important`,
+          overflow: 'hidden',
+          boxShadow: '0 -4px 32px rgba(0,0,0,0.12)',
+          transform: `translateY(${translateY}%)`,
           transition: isDragging
-            ? 'none !important'
+            ? 'none'
             : 'transform 0.3s cubic-bezier(0.4,0,0.2,1), border-radius 0.2s ease',
-        },
-      }}
-    >
-      {/* Drag handle — touchAction:none prevents scroll conflicts */}
-      <Box
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        sx={{
-          width: '100%',
-          py: 1.5,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          cursor: 'grab',
-          touchAction: 'none',
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
+          willChange: 'transform',
         }}
       >
-        <Box sx={{ width: 44, height: 5, bgcolor: 'action.disabled', borderRadius: 3 }} />
-      </Box>
+        {/* Drag handle */}
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          style={{
+            width: '100%',
+            padding: '14px 0 8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            cursor: 'grab',
+            touchAction: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+          }}
+        >
+          <div
+            style={{
+              width: 44,
+              height: 5,
+              backgroundColor: '#d1d5db',
+              borderRadius: 3,
+            }}
+          />
+        </div>
 
-      <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {children}
-      </Box>
-    </Drawer>
+        {/* Content */}
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {children}
+        </div>
+      </div>
+    </>,
+    document.body,
   );
 }
 

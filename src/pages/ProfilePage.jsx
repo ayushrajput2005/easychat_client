@@ -87,7 +87,7 @@ export default function ProfilePage() {
         <IconButton
           id="profile-edit-button"
           onClick={() => setEditing((v) => !v)}
-          color={editing ? 'secondary' : 'default'}
+          sx={{ color: editing ? '#111' : 'inherit' }}
           aria-label="edit profile"
         >
           <Edit />
@@ -170,7 +170,12 @@ export default function ProfilePage() {
               variant="outlined"
               fullWidth
               onClick={() => { setEditing(false); }}
-              sx={{ borderRadius: 4 }}
+              sx={{
+                borderRadius: 4,
+                borderColor: '#111',
+                color: '#111',
+                '&:hover': { borderColor: '#333', bgcolor: 'rgba(0,0,0,0.04)' },
+              }}
             >
               Cancel
             </Button>
@@ -182,7 +187,8 @@ export default function ProfilePage() {
               disabled={updateMutation.isPending}
               sx={{
                 borderRadius: 4,
-                background: 'linear-gradient(135deg, #1a1a2e 0%, #6c63ff 100%)',
+                bgcolor: '#111',
+                '&:hover': { bgcolor: '#333' },
               }}
             >
               {updateMutation.isPending ? <CircularProgress size={20} sx={{ color: 'white' }} /> : 'Save'}

@@ -4,15 +4,15 @@ const theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#1a1a2e',
-      light: '#2d2d44',
-      dark: '#0d0d1a',
+      main: '#111111',
+      light: '#333333',
+      dark: '#000000',
       contrastText: '#ffffff',
     },
     secondary: {
-      main: '#6c63ff',
-      light: '#9d95ff',
-      dark: '#4a44cc',
+      main: '#555555',
+      light: '#888888',
+      dark: '#222222',
       contrastText: '#ffffff',
     },
     background: {
@@ -20,7 +20,7 @@ const theme = createTheme({
       paper: '#ffffff',
     },
     text: {
-      primary: '#1a1a2e',
+      primary: '#111111',
       secondary: '#6b7280',
     },
     divider: '#e5e7eb',
@@ -81,7 +81,7 @@ const theme = createTheme({
             backgroundColor: '#f9fafb',
             '& fieldset': { borderColor: '#e5e7eb' },
             '&:hover fieldset': { borderColor: '#9ca3af' },
-            '&.Mui-focused fieldset': { borderColor: '#6c63ff', borderWidth: 2 },
+            '&.Mui-focused fieldset': { borderColor: '#111111', borderWidth: 2 },
           },
         },
       },
@@ -94,7 +94,7 @@ const theme = createTheme({
     MuiFab: {
       styleOverrides: {
         root: {
-          boxShadow: '0px 4px 16px rgba(108, 99, 255, 0.35)',
+          boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.18)',
         },
       },
     },
